@@ -32,6 +32,24 @@ It performs cluster-wise reliability gating with a p-budget and outputs fused pr
 
 pip install -r requirements.txt
 ## Quick Start (Example)
+```md
+## Input Data Format
+
+This repository assumes that feature extraction and model training have already been performed.
+The required inputs are:
+
+### DMAP Feature Files (`.npz`)
+Each `.npz` file must contain:
+- `X`: a NumPy array of shape `(N, d)` representing diffusion-map embeddings
+- `y`: a NumPy array of shape `(N,)` containing integer class labels
+
+### Probability Files (`.csv`)
+Each `.csv` file must contain class probabilities of shape `(N, C)`:
+- One row per sample
+- One column per class
+- Each row must sum to 1
+
+Baseline probabilities correspond to the DMAP classifier, while expert probabilities correspond to individual models (e.g., Snapshot Ensemble, Transformer, ViT).
 
 After installing the dependencies, the fusion pipeline can be executed as follows:
 
@@ -46,6 +64,7 @@ python run_fusion.py \
   --expert transformer path/to/transformer_probs_val.csv path/to/transformer_probs_test.csv \
   --expert vit         path/to/vit_probs_val.csv         path/to/vit_probs_test.csv \
   --out_dir outputs/run1
+
 
 
 
