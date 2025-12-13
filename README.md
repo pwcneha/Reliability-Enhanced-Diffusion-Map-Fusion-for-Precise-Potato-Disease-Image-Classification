@@ -31,6 +31,22 @@ It performs cluster-wise reliability gating with a p-budget and outputs fused pr
 ```bash
 
 pip install -r requirements.txt
+## Quick Start (Example)
+
+After installing the dependencies, the fusion pipeline can be executed as follows:
+
+```bash
+python run_fusion.py \
+  --dmap_train path/to/train_dmap.npz \
+  --dmap_val   path/to/val_dmap.npz \
+  --dmap_test  path/to/test_dmap.npz \
+  --base_val   path/to/dmap_probs_val.csv \
+  --base_test  path/to/dmap_probs_test.csv \
+  --expert snapshot    path/to/snapshot_probs_val.csv    path/to/snapshot_probs_test.csv \
+  --expert transformer path/to/transformer_probs_val.csv path/to/transformer_probs_test.csv \
+  --expert vit         path/to/vit_probs_val.csv         path/to/vit_probs_test.csv \
+  --out_dir outputs/run1
+
 
 
 
