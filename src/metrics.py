@@ -1,116 +1,109 @@
 import numpy as np
 from math import comb
 
-# ------------------------- basic helpers -------------------------
-def _clip_probs(P, eps=1e-12):
+
+def nll(P, y):
     P = np.asarray(P, dtype=float)
-    P = np.clip(P, eps, None)
-    P = P / np.clip(P.sum(axis=1, keepdims=True), eps, None)
-    return P
+    y = np.asarray(y, dtype=int)
+    r = np.arange(P.shape[0])
+    return float(-np.log(np.clip(P[r, y], 1e-12, None)).mean())
+
 
 def accuracy(P, y):
-    P = _clip_probs(P)
+    P = np.asarray(P, dtype=float)
     y = np.asarray(y, dtype=int)
     return float((P.argmax(1) == y).mean())
 
-def nll(P, y, eps=1e-12):
-    P = _clip_probs(P, eps=eps)
-    y = np.asarray(y, dtype=int)
-    rows = np.arange(P.shape[0])
-    return float(-np.log(np.clip(P[rows, y], eps, None)).mean())
 
 def brier(P, y):
-    P = _clip_probs(P)
+    P = np.asarray(P, dtype=float)
     y = np.asarray(y, dtype=int)
     C = P.shape[1]
     Y = np.eye(C)[y]
-    return float(np.mean(((P - Y) ** 2).sum(axis=1) / C))
+    return float(np.mean(((P - Y) ** 2).sum(1) / C))
+
 
 def ece(P, y, n_bins=15):
-    P = _clip_probs(P)
+    P = np.asarray(P, dtype=float)
     y = np.asarray(y, dtype=int)
-
     conf = P.max(1)
     pred = P.argmax(1)
-    correct = (pred == y).astype(float)
-
-    bins = np.linspace(0.0, 1.0, n_bins + 1)
+    corr = (pred == y).astype(float)
+    bins = np.linspace(0, 1, n_bins + 1)
     e = 0.0
     for i in range(n_bins):
-        lo = bins[i]
-        hi = bins[i + 1] + (1e-9 if i == n_bins - 1 else 0.0)
+        lo, hi = bins[i], bins[i + 1] + (1e-9 if i == n_bins - 1 else 0.0)
         m = (conf >= lo) & (conf < hi)
         if m.any():
-            e += m.mean() * abs(correct[m].mean() - conf[m].mean())
+            e += m.mean() * abs(corr[m].mean() - conf[m].mean())
     return float(e)
 
-# ------------------------- metrics bundle -------------------------
-def metrics_dict(P, y, n_bins=15):
-    """
-    Returns a dict of common metrics for probability predictions.
-    P: (N,C) probabilities
-    y: (N,) integer labels
-    """
-    P = _clip_probs(P)
-    y = np.asarray(y, dtype=int)
+
+def metrics_dict(P, y):
     return {
         "acc": accuracy(P, y),
         "nll": nll(P, y),
         "brier": brier(P, y),
-        "ece": ece(P, y, n_bins=n_bins),
-        "n": int(len(y)),
-        "c": int(P.shape[1]),
+        "ece": ece(P, y),
     }
 
-# ------------------------- statistical tests -------------------------
-def mcnemar_exact(y_pred_a, y_pred_b, y_true):
-    """
-    Exact two-sided McNemar test p-value based on discordant pairs.
-    y_pred_a / y_pred_b: (N,) predicted labels from method A/B
-    y_true: (N,) true labels
-    Returns: (p_value, n01, n10)
-      n01 = A correct, B wrong
-      n10 = A wrong, B correct
-    """
-    y_pred_a = np.asarray(y_pred_a, dtype=int)
-    y_pred_b = np.asarray(y_pred_b, dtype=int)
-    y_true   = np.asarray(y_true, dtype=int)
 
-    a_correct = (y_pred_a == y_true)
-    b_correct = (y_pred_b == y_true)
+def mcnemar_exact(yhat_base, yhat_fuse, y_true):
+    """
+    Exact McNemar test on discordant pairs.
+    Returns dict with p_value, n01, n10, discordant.
+    """
+    yhat_base = np.asarray(yhat_base, dtype=int)
+    yhat_fuse = np.asarray(yhat_fuse, dtype=int)
+    y_true = np.asarray(y_true, dtype=int)
 
-    n01 = int(np.sum(a_correct & ~b_correct))
-    n10 = int(np.sum(~a_correct & b_correct))
+    b_correct = (yhat_base == y_true)
+    f_correct = (yhat_fuse == y_true)
+
+    n01 = int(np.sum(b_correct & (~f_correct)))  # base right, fuse wrong
+    n10 = int(np.sum((~b_correct) & f_correct))  # base wrong, fuse right
     n = n01 + n10
+
     if n == 0:
-        return 1.0, n01, n10
+        p = 1.0
+    else:
+        k = min(n01, n10)
+        tail = sum(comb(n, i) for i in range(0, k + 1))
+        p = min(1.0, 2.0 * tail * (0.5 ** n))
 
-    k = min(n01, n10)
-    tail = sum(comb(n, i) for i in range(0, k + 1))
-    p = 2.0 * tail * (0.5 ** n)
-    p = float(min(1.0, p))
-    return p, n01, n10
+    return {
+        "p_value": float(p),
+        "n01_base_correct_fuse_wrong": int(n01),
+        "n10_base_wrong_fuse_correct": int(n10),
+        "discordant": int(n),
+    }
 
-def bootstrap_delta_nll_ci(P_a, P_b, y, n_boot=800, seed=42):
+
+def bootstrap_delta_nll_ci(P_a, P_b, y, seed=42, n_boot=800):
     """
-    Bootstrap CI for ΔNLL = NLL(B) - NLL(A)
-    Negative mean => B better than A.
-    Returns: dict(mean, ci95=[lo,hi])
+    ΔNLL = NLL(P_a) - NLL(P_b)
+    Returns mean + 95% CI.
     """
-    P_a = _clip_probs(P_a)
-    P_b = _clip_probs(P_b)
+    P_a = np.asarray(P_a, dtype=float)
+    P_b = np.asarray(P_b, dtype=float)
     y = np.asarray(y, dtype=int)
 
-    rng = np.random.default_rng(seed)
-    N = len(y)
+    rng = np.random.default_rng(int(seed))
+    N = P_a.shape[0]
     idx_all = np.arange(N)
 
-    deltas = []
-    for _ in range(int(n_boot)):
+    deltas = np.empty(int(n_boot), dtype=float)
+    for i in range(int(n_boot)):
         idx = rng.choice(idx_all, size=N, replace=True)
-        deltas.append(nll(P_b[idx], y[idx]) - nll(P_a[idx], y[idx]))
+        deltas[i] = nll(P_a[idx], y[idx]) - nll(P_b[idx], y[idx])
 
-    deltas = np.sort(np.asarray(deltas, dtype=float))
-    lo = float(deltas[int(0.025 * len(deltas))])
-    hi = float(deltas[int(0.975 * len(deltas))])
-    return {"mean": float(deltas.mean()), "ci95": [lo, hi]}
+    deltas.sort()
+    lo = float(deltas[int(0.025 * n_boot)])
+    hi = float(deltas[int(0.975 * n_boot)])
+    return {
+        "delta_nll_mean": float(deltas.mean()),
+        "ci95": [lo, hi],
+        "definition": "ΔNLL = NLL(A) - NLL(B)",
+    }
+
+
