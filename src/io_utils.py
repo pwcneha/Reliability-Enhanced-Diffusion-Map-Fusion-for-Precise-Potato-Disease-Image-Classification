@@ -1,40 +1,49 @@
+# src/io_utils.py
+from __future__ import annotations
+from pathlib import Path
 import json
 import numpy as np
-from pathlib import Path
 
 
-def load_npz_xy(path):
-    z = np.load(path, allow_pickle=True)
-    if "X" in z.files and "y" in z.files:
-        X, y = z["X"], z["y"]
-    else:
-        # fallback for unnamed arrays
-        X = z["arr_0"]
-        y = z["arr_1"] if "arr_1" in z.files else None
-        if y is None:
-            raise ValueError(f"{path}: could not find labels 'y' or arr_1 in npz")
-    return X, y.astype(int)
+def load_npz_xy(path: str):
+    path = str(path)
+    data = np.load(path, allow_pickle=False)
+    if "X" not in data or "y" not in data:
+        raise KeyError(f"{path} must contain keys 'X' and 'y'. Found: {list(data.keys())}")
+    X = data["X"]
+    y = data["y"]
+    return X, y
 
 
-def load_probs_csv(path):
-    P = np.loadtxt(path, delimiter=",")
-    P = np.asarray(P, dtype=float)
-    # defensively normalize
-    P = np.clip(P, 1e-12, None)
-    P = P / np.clip(P.sum(1, keepdims=True), 1e-12, None)
-    return P
+def load_probs_csv(path: str):
+    """
+    Loads a CSV containing probabilities of shape (N, C).
+    Supports optional header. Uses numpy only (no pandas dependency).
+    """
+    path = str(path)
+    try:
+        P = np.loadtxt(path, delimiter=",")
+        # If it accidentally loaded a single row as 1D, force 2D
+        if P.ndim == 1:
+            P = P.reshape(1, -1)
+        return P
+    except ValueError:
+        # likely header exists
+        P = np.loadtxt(path, delimiter=",", skiprows=1)
+        if P.ndim == 1:
+            P = P.reshape(1, -1)
+        return P
 
 
-def save_csv(path, arr):
+def save_csv(path: str | Path, arr):
     path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    np.savetxt(str(path), np.asarray(arr, dtype=float), delimiter=",")
+    arr = np.asarray(arr)
+    if arr.ndim != 2:
+        raise ValueError(f"save_csv expected 2D array, got shape {arr.shape}")
+    np.savetxt(str(path), arr.astype(float), delimiter=",", fmt="%.10f")
 
 
-def save_json(path, obj):
+def save_json(path: str | Path, obj):
     path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         json.dump(obj, f, indent=2)
-
-
