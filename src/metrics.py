@@ -1,109 +1,89 @@
+# src/metrics.py
+from __future__ import annotations
 import numpy as np
-from math import comb
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    confusion_matrix,
+    classification_report,
+    cohen_kappa_score,
+)
 
 
-def nll(P, y):
+def nll(P: np.ndarray, y: np.ndarray, eps: float = 1e-12) -> float:
     P = np.asarray(P, dtype=float)
     y = np.asarray(y, dtype=int)
-    r = np.arange(P.shape[0])
-    return float(-np.log(np.clip(P[r, y], 1e-12, None)).mean())
+    P = np.clip(P, eps, 1.0)
+    return float(-np.mean(np.log(P[np.arange(len(y)), y])))
 
 
-def accuracy(P, y):
+def metrics_dict(P: np.ndarray, y: np.ndarray) -> dict:
     P = np.asarray(P, dtype=float)
     y = np.asarray(y, dtype=int)
-    return float((P.argmax(1) == y).mean())
+    yhat = P.argmax(axis=1)
 
-
-def brier(P, y):
-    P = np.asarray(P, dtype=float)
-    y = np.asarray(y, dtype=int)
-    C = P.shape[1]
-    Y = np.eye(C)[y]
-    return float(np.mean(((P - Y) ** 2).sum(1) / C))
-
-
-def ece(P, y, n_bins=15):
-    P = np.asarray(P, dtype=float)
-    y = np.asarray(y, dtype=int)
-    conf = P.max(1)
-    pred = P.argmax(1)
-    corr = (pred == y).astype(float)
-    bins = np.linspace(0, 1, n_bins + 1)
-    e = 0.0
-    for i in range(n_bins):
-        lo, hi = bins[i], bins[i + 1] + (1e-9 if i == n_bins - 1 else 0.0)
-        m = (conf >= lo) & (conf < hi)
-        if m.any():
-            e += m.mean() * abs(corr[m].mean() - conf[m].mean())
-    return float(e)
-
-
-def metrics_dict(P, y):
-    return {
-        "acc": accuracy(P, y),
-        "nll": nll(P, y),
-        "brier": brier(P, y),
-        "ece": ece(P, y),
+    out = {
+        "accuracy": float(accuracy_score(y, yhat)),
+        "macro_f1": float(f1_score(y, yhat, average="macro")),
+        "kappa": float(cohen_kappa_score(y, yhat)),
+        "nll": float(nll(P, y)),
+        "confusion_matrix": confusion_matrix(y, yhat).tolist(),
+        "classification_report": classification_report(y, yhat, digits=4),
     }
+    return out
 
 
-def mcnemar_exact(yhat_base, yhat_fuse, y_true):
+def mcnemar_exact(yhat_a: np.ndarray, yhat_b: np.ndarray, y: np.ndarray):
     """
-    Exact McNemar test on discordant pairs.
-    Returns dict with p_value, n01, n10, discordant.
+    Exact McNemar test using binomial test on discordant pairs.
+    Returns: (p_value, n01, n10)
+    where
+      n01 = a correct, b wrong
+      n10 = a wrong, b correct
     """
-    yhat_base = np.asarray(yhat_base, dtype=int)
-    yhat_fuse = np.asarray(yhat_fuse, dtype=int)
-    y_true = np.asarray(y_true, dtype=int)
+    yhat_a = np.asarray(yhat_a, dtype=int)
+    yhat_b = np.asarray(yhat_b, dtype=int)
+    y = np.asarray(y, dtype=int)
 
-    b_correct = (yhat_base == y_true)
-    f_correct = (yhat_fuse == y_true)
+    a_correct = (yhat_a == y)
+    b_correct = (yhat_b == y)
 
-    n01 = int(np.sum(b_correct & (~f_correct)))  # base right, fuse wrong
-    n10 = int(np.sum((~b_correct) & f_correct))  # base wrong, fuse right
+    n01 = int(np.sum(a_correct & (~b_correct)))
+    n10 = int(np.sum((~a_correct) & b_correct))
     n = n01 + n10
-
     if n == 0:
-        p = 1.0
-    else:
-        k = min(n01, n10)
-        tail = sum(comb(n, i) for i in range(0, k + 1))
-        p = min(1.0, 2.0 * tail * (0.5 ** n))
+        return 1.0, n01, n10
 
-    return {
-        "p_value": float(p),
-        "n01_base_correct_fuse_wrong": int(n01),
-        "n10_base_wrong_fuse_correct": int(n10),
-        "discordant": int(n),
-    }
+    # two-sided exact binomial p-value under p=0.5
+    from math import comb
+    k = min(n01, n10)
+    p = 0.0
+    for i in range(0, k + 1):
+        p += comb(n, i) * (0.5 ** n)
+    p_value = min(1.0, 2.0 * p)
+    return float(p_value), n01, n10
 
 
-def bootstrap_delta_nll_ci(P_a, P_b, y, seed=42, n_boot=800):
+def bootstrap_delta_nll_ci(P_base, P_fused, y, n_boot=2000, seed=42):
     """
-    ΔNLL = NLL(P_a) - NLL(P_b)
-    Returns mean + 95% CI.
+    CI for delta NLL = (fused - base). Negative is better.
     """
-    P_a = np.asarray(P_a, dtype=float)
-    P_b = np.asarray(P_b, dtype=float)
-    y = np.asarray(y, dtype=int)
+    rng = np.random.default_rng(seed)
+    P_base = np.asarray(P_base, float)
+    P_fused = np.asarray(P_fused, float)
+    y = np.asarray(y, int)
 
-    rng = np.random.default_rng(int(seed))
-    N = P_a.shape[0]
-    idx_all = np.arange(N)
+    N = len(y)
+    deltas = []
+    for _ in range(int(n_boot)):
+        idx = rng.integers(0, N, size=N)
+        deltas.append(nll(P_fused[idx], y[idx]) - nll(P_base[idx], y[idx]))
 
-    deltas = np.empty(int(n_boot), dtype=float)
-    for i in range(int(n_boot)):
-        idx = rng.choice(idx_all, size=N, replace=True)
-        deltas[i] = nll(P_a[idx], y[idx]) - nll(P_b[idx], y[idx])
-
-    deltas.sort()
-    lo = float(deltas[int(0.025 * n_boot)])
-    hi = float(deltas[int(0.975 * n_boot)])
+    deltas = np.asarray(deltas, float)
     return {
         "delta_nll_mean": float(deltas.mean()),
-        "ci95": [lo, hi],
-        "definition": "ΔNLL = NLL(A) - NLL(B)",
+        "ci95_low": float(np.percentile(deltas, 2.5)),
+        "ci95_high": float(np.percentile(deltas, 97.5)),
+        "n_boot": int(n_boot),
+        "seed": int(seed),
     }
-
-
