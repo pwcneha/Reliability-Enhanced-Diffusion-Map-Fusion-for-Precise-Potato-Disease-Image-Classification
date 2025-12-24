@@ -1,6 +1,6 @@
-\# Budget-Gated Fusion (BGF) — DMAP Reliability Gate
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18045279.svg)](https://doi.org/10.5281/zenodo.18045279)
 
-
+# Budget-Gated Fusion (BGF) — DMAP Reliability Gate
 
 Research code accompanying the manuscript:
 
@@ -64,6 +64,7 @@ python run_fusion.py \
   --expert transformer path/to/transformer_probs_val.csv path/to/transformer_probs_test.csv \
   --expert vit         path/to/vit_probs_val.csv         path/to/vit_probs_test.csv \
   --out_dir outputs/run1
+
 
 
 
