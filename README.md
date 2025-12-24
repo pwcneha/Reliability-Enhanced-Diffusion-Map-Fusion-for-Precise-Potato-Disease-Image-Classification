@@ -4,10 +4,18 @@
 
 Research code accompanying the manuscript:
 
-\*\*"Budget-Gated Reliability-Aware Diffusion-Map Ensemble for Potato Disease Image Classification"\*\*
 
-(Submitted to The Visual Computer)
+## 📄 Associated Publication
 
+This repository contains the official implementation of the manuscript:
+
+**Reliability-Enhanced Diffusion-Map Fusion for Precise Potato Disease Image Classification**  
+(*Submitted to The Visual Computer*)
+
+The code is permanently archived on Zenodo and can be cited using the following DOI:  
+👉 https://doi.org/10.5281/zenodo.18045279
+
+If you use this code, please cite the corresponding manuscript.
 
 
 \## What this repository does
@@ -64,6 +72,7 @@ python run_fusion.py \
   --expert transformer path/to/transformer_probs_val.csv path/to/transformer_probs_test.csv \
   --expert vit         path/to/vit_probs_val.csv         path/to/vit_probs_test.csv \
   --out_dir outputs/run1
+
 
 
 
