@@ -4,12 +4,14 @@
 
 Research code accompanying the manuscript:
 
+## 📄 Associated Publication
+
+This repository contains the official implementation of the manuscript:
+
 **Reliability-Enhanced Diffusion-Map Fusion for Precise Potato Disease Image Classification**  
-(Submitted to *The Visual Computer*)
+(*Submitted to The Visual Computer*)
 
-This repository contains the **official implementation** of the Budget-Gated Fusion (BGF) framework proposed in the manuscript.
-
-The code is **permanently archived on Zenodo** and can be cited using the following DOI:  
+The code is permanently archived on Zenodo and can be cited using the following DOI:  
 👉 https://doi.org/10.5281/zenodo.18045279
 
 If you use this code, please cite the corresponding manuscript.
@@ -29,9 +31,9 @@ the repository performs:
 - Cluster-wise reliability estimation in DMAP space
 - Budget-controlled expert overriding using expected negative log-likelihood (NLL)
 - Reliability-aware probability fusion
-- Quantitative evaluation including accuracy, NLL, McNemar’s test, and bootstrap confidence intervals
+- Quantitative evaluation including accuracy and NLL
 
-The output consists of fused probability predictions and a structured evaluation report.
+The output consists of fused probability predictions and evaluation metrics.
 
 ---
 
@@ -39,4 +41,3 @@ The output consists of fused probability predictions and a structured evaluation
 
 ```bash
 pip install -r requirements.txt
-
