@@ -2,6 +2,7 @@
 
 # Budget-Gated Fusion (BGF) — DMAP Reliability Gate
 
+
 Research code accompanying the manuscript:
 
 
@@ -81,6 +82,7 @@ python run_fusion.py \
   --expert transformer path/to/transformer_probs_val.csv path/to/transformer_probs_test.csv \
   --expert vit         path/to/vit_probs_val.csv         path/to/vit_probs_test.csv \
   --out_dir outputs/run1
+
 
 
 
