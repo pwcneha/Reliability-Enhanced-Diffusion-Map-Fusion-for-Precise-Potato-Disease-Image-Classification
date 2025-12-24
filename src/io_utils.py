@@ -1,37 +1,34 @@
-from __future__ import annotations
 from pathlib import Path
 import json
 import numpy as np
 
 
-def load_npz_xy(path: str):
-    z = np.load(path, allow_pickle=False)
-    if "X" not in z or "y" not in z:
-        raise KeyError(f"{path} must contain keys: 'X' and 'y'")
-    X = np.asarray(z["X"])
-    y = np.asarray(z["y"]).astype(int)
-    return X, y
+def load_npz_xy(path):
+    data = np.load(path)
+    if "X" not in data or "y" not in data:
+        raise ValueError(f"{path} must contain keys 'X' and 'y'")
+    return data["X"], data["y"].astype(int)
 
 
-def load_probs_csv(path: str):
+def load_probs_csv(path):
     arr = np.loadtxt(path, delimiter=",", dtype=float)
     if arr.ndim == 1:
-        # single sample edge case -> (1, C)
         arr = arr[None, :]
     return arr
 
 
-def save_csv(path: Path, arr):
+def save_csv(path, arr):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    A = np.asarray(arr, dtype=float)
-    if A.ndim != 2:
-        raise ValueError(f"save_csv expects 2D array, got shape {A.shape}")
-    np.savetxt(str(path), A, delimiter=",")
+    arr = np.asarray(arr, dtype=float)
+    if arr.ndim != 2:
+        raise ValueError(f"Expected 2D array, got {arr.shape}")
+    np.savetxt(path, arr, delimiter=",")
 
 
-def save_json(path: Path, obj):
+def save_json(path, obj):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
+    with open(path, "w") as f:
         json.dump(obj, f, indent=2)
+
