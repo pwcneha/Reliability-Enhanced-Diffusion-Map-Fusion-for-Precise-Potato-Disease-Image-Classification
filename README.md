@@ -39,7 +39,16 @@ It performs cluster-wise reliability gating with a p-budget and outputs fused pr
 ```bash
 
 pip install -r requirements.txt
-## Quick Start (Example)
+## Quick Start 
+## 🔁 Reproducibility Notes
+
+This code reproduces the Budget-Gated Fusion (BGF) experiments reported in the manuscript.
+The released version (v1.0.1) corresponds exactly to the results presented in the paper.
+
+- Accuracy, NLL, and reliability metrics are computed from the saved probability outputs.
+- Budget-controlled prediction overrides affect a bounded fraction of test samples.
+- The Zenodo DOI ensures long-term availability of the exact code version used.
+
 ```md
 ## Input Data Format
 
@@ -72,6 +81,7 @@ python run_fusion.py \
   --expert transformer path/to/transformer_probs_val.csv path/to/transformer_probs_test.csv \
   --expert vit         path/to/vit_probs_val.csv         path/to/vit_probs_test.csv \
   --out_dir outputs/run1
+
 
 
 
