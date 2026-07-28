@@ -1,0 +1,28 @@
+{
+  "description": "Locked BGF-v1 configuration used for the final group-aware IARI analysis",
+  "cohort_n": 866,
+  "outer_folds": 5,
+  "inner_folds": 4,
+  "regional_coordinates": "First two fold-specific DMAP coordinates divided by one development-fitted global RMS scalar",
+  "n_regions": 3,
+  "minimum_region_n": 10,
+  "minimum_nll_gain": 0.003,
+  "minimum_nll_gain_operator": ">=",
+  "maximum_ece_drift": 0.015,
+  "maximum_ece_drift_operator": "<=",
+  "minimum_expert_margin": 0.08,
+  "minimum_expert_margin_operator": ">=",
+  "maximum_edit_rate": 0.05,
+  "budget_rounding": "floor",
+  "random_seed": 42,
+  "kmeans_n_init": 50,
+  "kmeans_max_iter": 1000,
+  "expert_order": [
+    "Snapshot MLP ensemble",
+    "Transformer ensemble",
+    "DeiT-III Small"
+  ],
+  "primary_policy": "as_executed",
+  "reconciliation_policy": "equation_consistent",
+  "heldout_labels_used_for_policy_construction": false
+}
