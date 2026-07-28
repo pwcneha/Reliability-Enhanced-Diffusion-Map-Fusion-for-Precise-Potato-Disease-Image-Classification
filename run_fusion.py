@@ -1,91 +1,171 @@
+"""Construct both locked BGF-v1 policies for one outer fold.
+
+The input package contains development labels and fold-local development and
+held-out probability streams. Held-out labels are forbidden. Performance
+evaluation is intentionally separate from policy construction.
+"""
+
+from __future__ import annotations
+
 import argparse
-import numpy as np
+import json
 from pathlib import Path
 
-from src.io_utils import load_npz_xy, load_probs_csv, save_csv, save_json
-from src.metrics import metrics_dict, mcnemar_exact, bootstrap_delta_nll_ci
-from src.bgf_gate import fit_cluster_reliability, budgeted_gate_strict
+import numpy as np
+
+from src.bgf_gate import (
+    BGFConfig,
+    apply_regional_gate,
+    apply_temperature,
+    build_regional_policy,
+    build_regions,
+    fit_temperature,
+)
+from src.io_utils import (
+    load_policy_input_npz,
+    save_json,
+    save_npz,
+    save_table,
+)
 
 
-def parse_args():
-    p = argparse.ArgumentParser("Budget-Gated Fusion (BGF)")
-    p.add_argument("--dmap_train", required=True)
-    p.add_argument("--dmap_val", required=True)
-    p.add_argument("--dmap_test", required=True)
-    p.add_argument("--base_val", required=True)
-    p.add_argument("--base_test", required=True)
-    p.add_argument("--expert", action="append", nargs=3, required=True)
-    p.add_argument("--out_dir", required=True)
-    p.add_argument("--k_clust", type=int, default=12)
-    p.add_argument("--budget", type=float, default=0.05)
-    p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--margin_min_nll", type=float, default=0.0)
-    p.add_argument("--delta_conf", type=float, default=0.0)
-    return p.parse_args()
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Construct the as-executed and equation-consistent BGF "
+            "policies for one group-aware outer fold."
+        )
+    )
+    parser.add_argument(
+        "--input",
+        required=True,
+        help="Fold-local NPZ package without held-out labels.",
+    )
+    parser.add_argument(
+        "--config",
+        default="configs/bgf_thresholds.json",
+        help="Path to the locked public BGF configuration.",
+    )
+    parser.add_argument(
+        "--out-dir",
+        required=True,
+        help="Output directory for predictions and audit tables.",
+    )
+    parser.add_argument(
+        "--fold-id",
+        default="unspecified",
+        help="Descriptive fold identifier written to the summary.",
+    )
+    return parser.parse_args()
 
 
-def main():
+def load_config(path: str | Path) -> tuple[BGFConfig, dict]:
+    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    config = BGFConfig(
+        n_regions=int(raw["n_regions"]),
+        minimum_region_n=int(raw["minimum_region_n"]),
+        minimum_nll_gain=float(raw["minimum_nll_gain"]),
+        maximum_ece_drift=float(raw["maximum_ece_drift"]),
+        minimum_expert_margin=float(raw["minimum_expert_margin"]),
+        maximum_edit_rate=float(raw["maximum_edit_rate"]),
+        random_seed=int(raw["random_seed"]),
+        kmeans_n_init=int(raw["kmeans_n_init"]),
+        kmeans_max_iter=int(raw["kmeans_max_iter"]),
+    )
+    return config, raw
+
+
+def main() -> None:
     args = parse_args()
-    out = Path(args.out_dir)
-    out.mkdir(parents=True, exist_ok=True)
+    output_dir = Path(args.out_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    Xtr, ytr = load_npz_xy(args.dmap_train)
-    Xv, yv = load_npz_xy(args.dmap_val)
-    Xt, yt = load_npz_xy(args.dmap_test)
+    config, raw_config = load_config(args.config)
+    data = load_policy_input_npz(args.input)
 
-    base_val = load_probs_csv(args.base_val)
-    base_test = load_probs_csv(args.base_test)
-
-    experts_val, experts_test = [], []
-    for name, v, t in args.expert:
-        experts_val.append((name, load_probs_csv(v)))
-        experts_test.append((name, load_probs_csv(t)))
-
-    cluster_nll, ct_test = fit_cluster_reliability(
-        Xtr, Xv, Xt, yv, base_val, experts_val,
-        k_clust=args.k_clust, seed=args.seed
+    development_regions, heldout_regions, _, global_rms = build_regions(
+        data["development_dmap"],
+        data["heldout_dmap"],
+        config=config,
+    )
+    policy, regional_audit = build_regional_policy(
+        data["development_labels"],
+        data["development_probability_tensor"],
+        development_regions,
+        config=config,
+    )
+    save_table(
+        output_dir / "regional_expert_policy_audit.csv",
+        regional_audit,
     )
 
-    fused_test = budgeted_gate_strict(
-        base_test, experts_test, cluster_nll, ct_test,
-        budget=args.budget,
-        margin_min_nll=args.margin_min_nll,
-        delta_conf=args.delta_conf
-    )
-
-    save_csv(out / "base_probs_test.csv", base_test)
-    save_csv(out / "fused_probs_test.csv", fused_test)
-
-    base_metrics = metrics_dict(base_test, yt)
-    fused_metrics = metrics_dict(fused_test, yt)
-
-    yhat_base = base_test.argmax(1)
-    yhat_fuse = fused_test.argmax(1)
-
-    p_val, n01, n10 = mcnemar_exact(yhat_base, yhat_fuse, yt)
-    delta_ci = bootstrap_delta_nll_ci(base_test, fused_test, yt)
-
-    changed_probs = int((np.abs(base_test - fused_test).max(1) > 1e-12).sum())
-    changed_labels = int((yhat_base != yhat_fuse).sum())
-
-    report = {
-        "config": vars(args),
-        "base_metrics": base_metrics,
-        "fused_metrics": fused_metrics,
-        "override_stats": {
-            "overridden_prob_rows": changed_probs,
-            "overridden_prob_fraction": changed_probs / len(yt),
-            "label_flips": changed_labels,
-            "label_flip_fraction": changed_labels / len(yt),
-        },
-        "mcnemar": {"p_value": p_val, "n01": n01, "n10": n10},
-        "delta_nll_ci": delta_ci,
+    summary = {
+        "fold_id": str(args.fold_id),
+        "development_n": int(len(data["development_labels"])),
+        "heldout_n": int(len(data["heldout_source_ids"])),
+        "global_dmap_rms": float(global_rms),
+        "heldout_labels_accessed": False,
+        "configuration": raw_config,
+        "policies": {},
     }
 
-    save_json(out / "report.json", report)
-    print(f"[OK] Saved outputs to {out}")
+    for version in ("as_executed", "equation_consistent"):
+        development_result = apply_regional_gate(
+            data["development_probability_tensor"],
+            development_regions,
+            data["development_source_ids"],
+            policy,
+            version,
+            config=config,
+        )
+        heldout_result = apply_regional_gate(
+            data["heldout_probability_tensor"],
+            heldout_regions,
+            data["heldout_source_ids"],
+            policy,
+            version,
+            config=config,
+        )
+        temperature, temperature_status = fit_temperature(
+            data["development_labels"],
+            development_result["probabilities"],
+        )
+        heldout_post = apply_temperature(
+            heldout_result["probabilities"],
+            temperature,
+        )
+
+        save_table(
+            output_dir / f"{version}_candidates.csv",
+            heldout_result["candidate_table"],
+        )
+        save_npz(
+            output_dir / f"{version}_heldout_predictions.npz",
+            source_ids=data["heldout_source_ids"],
+            regions=heldout_regions,
+            probabilities_pre=heldout_result["probabilities"],
+            probabilities_post=heldout_post,
+            accepted_mask=heldout_result["accepted_mask"],
+            selected_expert_indices=heldout_result[
+                "selected_expert_indices"
+            ],
+            temperature=np.asarray([temperature], dtype=np.float64),
+            heldout_labels_accessed=np.asarray([False], dtype=bool),
+        )
+        summary["policies"][version] = {
+            "candidate_n": int(heldout_result["candidate_n"]),
+            "accepted_n": int(heldout_result["accepted_n"]),
+            "maximum_edits": int(heldout_result["maximum_edits"]),
+            "temperature": float(temperature),
+            "temperature_status": temperature_status,
+        }
+
+    save_json(output_dir / "bgf_construction_summary.json", summary)
+    print(
+        "BGF construction complete. Held-out labels were not accepted "
+        f"or accessed. Outputs: {output_dir}"
+    )
 
 
 if __name__ == "__main__":
     main()
-

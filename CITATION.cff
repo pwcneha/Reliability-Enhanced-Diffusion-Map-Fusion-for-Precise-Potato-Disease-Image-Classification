@@ -1,0 +1,35 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the archived release."
+type: software
+title: "Reliability-Aware Budget-Gated Diffusion-Map Fusion for Calibrated Potato Disease Image Classification"
+version: 2.0.0
+date-released: 2026-07-28
+authors:
+  - family-names: "Neha"
+    affiliation: "University School of Information, Communication and Technology, Guru Gobind Singh Indraprastha University, New Delhi, India"
+  - family-names: "Chug"
+    given-names: "Anuradha"
+    affiliation: "University School of Information, Communication and Technology, Guru Gobind Singh Indraprastha University, New Delhi, India"
+  - family-names: "Singh"
+    given-names: "Amit Prakash"
+    affiliation: "University School of Information, Communication and Technology, Guru Gobind Singh Indraprastha University, New Delhi, India"
+  - family-names: "Shanmugam"
+    given-names: "V."
+    affiliation: "Division of Plant Pathology, ICAR–Indian Agricultural Research Institute, New Delhi, India"
+  - family-names: "Singh"
+    given-names: "Ravinder Kumar"
+    affiliation: "Division of Plant Pathology, ICAR–Indian Agricultural Research Institute, New Delhi, India"
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.18045278"
+repository-code: "https://github.com/pwcneha/Reliability-Enhanced-Diffusion-Map-Fusion-for-Precise-Potato-Disease-Image-Classification"
+url: "https://doi.org/10.5281/zenodo.18045278"
+license: MIT
+keywords:
+  - "potato disease classification"
+  - "Budget-Gated Fusion"
+  - "Diffusion Maps"
+  - "probability calibration"
+  - "group-aware cross-validation"
+  - "selective expert correction"
+abstract: "Reproducibility code and locked configuration for a bounded, region-aware correction policy evaluated for calibrated potato disease image classification."

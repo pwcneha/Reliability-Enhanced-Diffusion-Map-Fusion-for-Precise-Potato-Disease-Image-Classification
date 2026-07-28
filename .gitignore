@@ -1,0 +1,56 @@
+# Python caches and build artefacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Notebook and test caches
+.ipynb_checkpoints/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local configuration and credentials
+.env
+.env.*
+*.pem
+*.key
+credentials.json
+secrets.json
+
+# Private or locally generated data
+data/
+private_data/
+raw_data/
+models/
+checkpoints/
+outputs/
+results_local/
+
+# Large trained-model files
+*.keras
+*.h5
+*.ckpt
+*.pt
+*.pth
+
+# Local archives and temporary files
+*.zip
+*.tar
+*.tar.gz
+*.tmp
+*.temp
+*.log
+
+# Operating-system and editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/

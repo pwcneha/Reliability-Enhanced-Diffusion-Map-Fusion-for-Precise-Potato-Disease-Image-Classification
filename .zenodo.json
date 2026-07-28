@@ -1,0 +1,39 @@
+{
+  "creators": [
+    {
+      "name": "Neha",
+      "affiliation": "University School of Information, Communication and Technology, Guru Gobind Singh Indraprastha University, New Delhi, India"
+    },
+    {
+      "name": "Chug, Anuradha",
+      "affiliation": "University School of Information, Communication and Technology, Guru Gobind Singh Indraprastha University, New Delhi, India"
+    },
+    {
+      "name": "Singh, Amit Prakash",
+      "affiliation": "University School of Information, Communication and Technology, Guru Gobind Singh Indraprastha University, New Delhi, India"
+    },
+    {
+      "name": "Shanmugam, V.",
+      "affiliation": "Division of Plant Pathology, ICAR–Indian Agricultural Research Institute, New Delhi, India"
+    },
+    {
+      "name": "Singh, Ravinder Kumar",
+      "affiliation": "Division of Plant Pathology, ICAR–Indian Agricultural Research Institute, New Delhi, India"
+    }
+  ],
+  "title": "Reliability-Aware Budget-Gated Diffusion-Map Fusion for Calibrated Potato Disease Image Classification",
+  "description": "Reproducibility code and locked configuration for a bounded, region-aware correction policy evaluated for calibrated potato disease image classification. The release preserves both the as-executed and equation-consistent BGF implementations and their audit metadata.",
+  "version": "2.0.0",
+  "access_right": "open",
+  "keywords": [
+    "potato disease classification",
+    "Budget-Gated Fusion",
+    "Diffusion Maps",
+    "probability calibration",
+    "group-aware cross-validation",
+    "selective expert correction"
+  ],
+  "license": "mit",
+  "upload_type": "software",
+  "language": "eng"
+}
